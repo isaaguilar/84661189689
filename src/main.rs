@@ -1,3 +1,4 @@
+use axum::extract::Path;
 use axum::extract::State;
 use axum::{
     Json, Router,
@@ -8,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 use std::sync::Arc;
 
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, sqlx::FromRow)]
 struct Movie {
     id: String,
     name: String,
@@ -36,7 +37,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // `GET /` goes to `root`
         .route("/movie/{id}", get(get_movie))
         .route("/movie", post(post_movie))
-        // `POST /users` goes to `create_user`
         .with_state(state);
 
     // run our app with hyper, listening globally on port 3000
@@ -47,7 +47,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 // basic handler that responds with a static string
-async fn get_movie() -> Result<Json<Movie>, (StatusCode, String)> {
+async fn get_movie(
+    Path(id): Path<String>,
+    State(state): State<Arc<AppState>>,
+) -> Result<Json<Movie>, (StatusCode, String)> {
+    // TODO
+    // sqlx::query_as::<_, Movie>(
+    //     r#"
+    //     SELECT * FROM movies WHERE id = $1
+    // "#,
+    // )
+    // .bind(id)
+    // .fetch_one(&state.db);
+
     Ok(Json(Movie {
         id: String::from("()"),
         name: String::from("()"),
@@ -66,10 +78,10 @@ async fn post_movie(
             (id, name, year, was_good)
         VALUES 
             (
-            (SELECT gen_random_uuid()),
-            "Hello", 
-            2000,
-            false
+                (SELECT gen_random_uuid()),
+                'Hello', 
+                2000,
+                false
             )
         "#,
     )
@@ -79,36 +91,7 @@ async fn post_movie(
         Ok(_) => Ok((StatusCode::NO_CONTENT, String::new())),
         Err(e) => Err((
             StatusCode::INTERNAL_SERVER_ERROR,
-            String::from("Failed to insert into db"),
+            format!("Failed to insert into db {e}"),
         )),
     }
-}
-
-async fn create_user(
-    // this argument tells axum to parse the request body
-    // as JSON into a `CreateUser` type
-    Json(payload): Json<CreateUser>,
-) -> (StatusCode, Json<User>) {
-    // insert your application logic here
-    let user = User {
-        id: 1337,
-        username: payload.username,
-    };
-
-    // this will be converted into a JSON response
-    // with a status code of `201 Created`
-    (StatusCode::CREATED, Json(user))
-}
-
-// the input to our `create_user` handler
-#[derive(Deserialize)]
-struct CreateUser {
-    username: String,
-}
-
-// the output to our `create_user` handler
-#[derive(Serialize)]
-struct User {
-    id: u64,
-    username: String,
 }
